@@ -1,0 +1,5 @@
+
+*.png
+/.vmake
+.vmake_cache
+/build
