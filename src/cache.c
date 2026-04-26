@@ -20,9 +20,12 @@
 
 int is_c_file(const char *filename) {
     size_t len = strlen(filename);
-    if (len < 2) return 0;
-
-    return strcmp(filename + len - 2, ".c") == 0;
+    if (len < 3) return 0;
+    if (len >= 2 && strcmp(filename + len - 2, ".c") == 0) return 1;
+    if (len >= 4 && strcmp(filename + len - 4, ".cpp") == 0) return 1;
+    if (len >= 3 && strcmp(filename + len - 3, ".cc") == 0) return 1;
+    if (len >= 4 && strcmp(filename + len - 4, ".cxx") == 0) return 1;
+    return 0;
 }
 
 
