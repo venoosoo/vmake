@@ -160,7 +160,6 @@ build/
 ## Limitations
 
 - Executables only (no static/shared library targets yet)
-- No support for linker-only flags (`-lz`, `-lm`, etc.) yet
 - No Windows support yet
 
 ---
