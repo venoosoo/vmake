@@ -89,6 +89,7 @@ executable "myapp" {
 | `output` | Output directory for the compiled binary |
 | `cc` | Compiler (`clang`, `gcc`, etc.) |
 | `flags` | Compiler flags, space-separated |
+| `ldfalgs` | Linker flags, space-separated |
 
 ### Multiple targets
 
@@ -99,6 +100,7 @@ executable "engine" {
     output = "build/";
     cc = "clang";
     flags = "-O3";
+    ldflags = "-lm -lpthread";
 }
 
 executable "tools" {
@@ -107,6 +109,7 @@ executable "tools" {
     output = "build/";
     cc = "gcc";
     flags = "-O2 -Wall";
+    ldflags = "-L./tools/lib -lutil";
 }
 ```
 
