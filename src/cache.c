@@ -29,28 +29,37 @@ int is_c_file(const char *filename) {
 }
 
 
-uint64_t hash_file(char* path) {
+XXH128_hash_t hash_file(char* path) {
     FILE* f = fopen(path, "rb");
     if (!f) {
         perror("fopen failed");
         printf("path = %s\n", path);
-        return 0;
+        
+        // Return a zeroed-out struct on failure
+        XXH128_hash_t zero_hash = {0, 0};
+        return zero_hash;
     }
 
-    XXH64_state_t* state = XXH64_createState();
-    XXH64_reset(state, 0);
+    XXH3_state_t* state = XXH3_createState();
+    if (state == NULL) {
+        fclose(f);
+        XXH128_hash_t zero_hash = {0, 0};
+        return zero_hash;
+    }
+
+    XXH3_128bits_reset(state);
 
     char buffer[4096];
     size_t n;
 
     while ((n = fread(buffer, 1, sizeof(buffer), f)) > 0) {
-        XXH64_update(state, buffer, n);
+        XXH3_128bits_update(state, buffer, n);
     }
 
     fclose(f);
 
-    uint64_t hash = XXH64_digest(state);
-    XXH64_freeState(state);
+    XXH128_hash_t hash = XXH3_128bits_digest(state);
+    XXH3_freeState(state);
 
     return hash;
 }
@@ -67,8 +76,8 @@ void save_cache(struct FileCache** targets_cache) {
         for (size_t j = 0; j < arrlen(targets_cache[i]->cache); j++) {
             char* key = targets_cache[i]->cache[j]->key;
             struct IncludeMap* map = targets_cache[i]->dependency_map;
-            uint64_t hash = targets_cache[i]->cache[j]->value->hash;
-            fprintf(cache_file, "%s %lu %ld %ld > ", key, hash, targets_cache[i]->cache[j]->value->time, targets_cache[i]->cache[j]->value->size);
+            XXH128_hash_t hash = targets_cache[i]->cache[j]->value->hash;
+            fprintf(cache_file, "%s %016lx%016lx %ld %ld > ", key, hash.high64,hash.low64, targets_cache[i]->cache[j]->value->time, targets_cache[i]->cache[j]->value->size);
             struct IncludeMap* file_data = shgetp_null(map,key);
             if (file_data) {
                 for (size_t k = 0; k < arrlen(file_data->value); k++) {
@@ -102,7 +111,6 @@ struct Cache* get_cache(char* file_path) {
 
 struct Cache** get_current_cache(struct Target* target, struct IncludeMap* dependency_map, struct Cache* saved_cache) {
     struct Cache** cache_arr = NULL;
-    struct stat stats;
     for (size_t i = 0; i < arrlen(target->sources); i++) {
         struct stat file_stat;
         stat(target->sources[i],&file_stat);
@@ -123,7 +131,7 @@ struct Cache** get_current_cache(struct Target* target, struct IncludeMap* depen
 }
 
 
-void add_unique_recompile(char*** recompile, char* value) {
+void add_unique(char*** recompile, char* value) {
     for (size_t i = 0; i < arrlen(*recompile); i++) {
         if (strcmp(value, (*recompile)[i]) == 0) {
             return;
@@ -165,26 +173,33 @@ struct Cache* get_saved_cache(char* target_name) {
         if (buffer[0] == '[') break;
 
         char* file = xmalloc(256);
-        uint64_t hash;
-        int64_t time;
-        int64_t size;
+        unsigned long long hash_high, hash_low;
         int offset = 0;
-        if (sscanf(buffer, "%255s %lu %ld %ld > %n", file, &hash,&time,&size, &offset) >= 2) {
+        
+        if (sscanf(buffer, "%255s %016llx%016llx > %n", file, &hash_high, &hash_low, &offset) >= 3) {
             char** dependencies = NULL;
-            char* temp = buffer + offset;
-            char* token = strtok(temp, " ");
-            while (token != NULL) {
-                char* dep = xmalloc(strlen(token) + 1);
-                strcpy(dep, token);
-                arrput(dependencies, dep);
-                token = strtok(NULL, " ");
+            
+            if (offset > 0 && buffer[offset] != '\0') {
+                char* temp = buffer + offset;
+                char* token = strtok(temp, " ");
+                while (token != NULL) {
+                    char* dep = xmalloc(strlen(token) + 1);
+                    strcpy(dep, token);
+                    arrput(dependencies, dep);
+                    token = strtok(NULL, " ");
+                }
             }
+            
             struct CacheData* data = xmalloc(sizeof(struct CacheData));
-            data->hash = hash;
+            
+            data->hash.high64 = hash_high;
+            data->hash.low64  = hash_low;
+            
             data->dependencies = dependencies;
-            data->time = time;
-            data->size = size;
+            
             shput(cache, file, data);
+        } else {
+            free(file); 
         }
     }
 
@@ -199,12 +214,12 @@ char** compare_cache(struct Cache** current_cache, struct Cache* saved_cache) {
         struct Cache* curr_cache = current_cache[i];
         struct Cache* found_cache = shgetp_null(saved_cache,curr_cache->key); 
         if (found_cache) {
-            if (curr_cache->value->hash != found_cache->value->hash) {
-                add_unique_recompile(&recompile, found_cache->key);
-            }
+                if (!XXH128_isEqual(curr_cache->value->hash, found_cache->value->hash)) {
+                    add_unique(&recompile, found_cache->key);
+                }
         } else {
             if (is_c_file(curr_cache->key)) {
-                add_unique_recompile(&recompile, curr_cache->key);
+                add_unique(&recompile, curr_cache->key);
             }
         }
     }

@@ -64,19 +64,6 @@ void scan_file(struct Target* target,struct IncludeMap** hash_map,char* source) 
         if (strstr(buffer, "#include") != NULL) {
             char* ptr = buffer;
 
-            for (int j = 0; j < arrlen(arr); j++) {
-                char* resolved_path = resolve_path(target, arr[j]);
-                if (resolved_path == arr[j]) continue; // not found, skip
-                struct IncludeMap* res = shgetp_null(*hash_map, resolved_path);
-                if (res) {
-                    arrput(res->value, source);
-                } else {
-                    char** new_arr = NULL;
-                    arrput(new_arr, source);
-                    shput(*hash_map, resolved_path, new_arr);
-                }
-            }
-
             while (*ptr == ' ' || *ptr == '\t') ptr++;
 
             ptr += strlen("#include");
@@ -101,6 +88,7 @@ void scan_file(struct Target* target,struct IncludeMap** hash_map,char* source) 
 
     for (int j = 0; j < arrlen(arr); j++) {
         char* resolved_path = resolve_path(target, arr[j]);
+        if (resolved_path == arr[j]) continue;
         struct IncludeMap* res = shgetp_null(*hash_map,resolved_path);
         if (res) {
             arrput(res->value,source);
@@ -119,7 +107,7 @@ void scan_file(struct Target* target,struct IncludeMap** hash_map,char* source) 
 
 struct Ccache {
     char* key;
-    uint64_t value;
+    XXH128_hash_t value;
 };
 
 
@@ -129,7 +117,7 @@ struct Ccache {
 struct IncludeMap* scan(struct Target* target, struct Cache* saved_cache) {
     struct IncludeMap* hash_map = NULL;
     struct Ccache* c_cache = NULL;
-    struct Ccache* to_rescan = NULL;
+    char** to_rescan = NULL;
 
     if (shlen(saved_cache) < 1) {
         for (int i = 0; i < arrlen(target->sources); i++) {
@@ -141,17 +129,16 @@ struct IncludeMap* scan(struct Target* target, struct Cache* saved_cache) {
     for (int i = 0; i < shlen(saved_cache); i++) {
         struct Cache check = saved_cache[i];
         if (is_c_file(check.key)) {
-            if (hash_file(check.key) != check.value->hash) {
-                if (shgeti(to_rescan, check.key) < 0)
-                    shput(to_rescan, check.key, check.value->hash);
+            if (XXH128_isEqual(hash_file(check.key), check.value->hash)) {
+                add_unique(&to_rescan, check.key);
             }
             shput(c_cache, check.key, check.value->hash);
         } else {
-            if (hash_file(resolve_path(target, check.key)) != check.value->hash) {
+            char* resovled_path = resolve_path(target, check.key);
+
+            if (XXH128_isEqual(hash_file(resovled_path), check.value->hash)) {
                 for (int j = 0; j < arrlen(check.value->dependencies); j++) {
-                    char* dep = check.value->dependencies[j];
-                    if (shgeti(to_rescan, dep) < 0)
-                        shput(to_rescan, dep, 0);
+                    add_unique(&to_rescan, check.value->dependencies[j]);
                 }
                 continue;
             }
@@ -159,24 +146,21 @@ struct IncludeMap* scan(struct Target* target, struct Cache* saved_cache) {
             for (int j = 0; j < arrlen(check.value->dependencies); j++) {
                 struct Ccache* hash = shgetp_null(c_cache, check.value->dependencies[j]);
                 if (hash) {
-                    if (hash_file(check.value->dependencies[j]) == hash->value) {
+                    if (XXH128_isEqual(hash_file(check.value->dependencies[j]), hash->value)) {
                         arrput(depend_arr, check.value->dependencies[j]);
                     } else {
-                        char* dep = check.value->dependencies[j];
-                        if (shgeti(to_rescan, dep) < 0)
-                            shput(to_rescan, dep, 0);
+                        add_unique(&to_rescan, check.value->dependencies[j]);
                     }
                 }
             }
-            shput(hash_map, check.key, depend_arr);
         }
     }
 
-    for (int i = 0; i < shlen(to_rescan); i++) {
-        scan_file(target, &hash_map, to_rescan[i].key);
+    for (int i = 0; i < arrlen(to_rescan); i++) {
+        scan_file(target, &hash_map, to_rescan[i]);
     }
 
-    shfree(to_rescan);
+    arrfree(to_rescan);
     return hash_map;
 }
 

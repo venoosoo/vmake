@@ -97,15 +97,15 @@ void link_objects(struct Target* target) {
     if (link_pid == 0) {
         
         // Math for size: CC (1) + Flags (N) + Objects (N) + "-o" (1) + Output Name (1) + NULL (1)
-        int arg_size = 1 + arrlen(target->flags) + arrlen(target->sources) + 3;
+        int arg_size = 1 + arrlen(target->linker_flags) + arrlen(target->sources) + 3;
         
         char** arg = xmalloc(sizeof(char*) * arg_size);
         int arg_ptr = 0;
 
         arg[arg_ptr++] = target->cc;
 
-        for (int i = 0; i < arrlen(target->flags); i++) {
-            arg[arg_ptr++] = target->flags[i];
+        for (int i = 0; i < arrlen(target->linker_flags); i++) {
+            arg[arg_ptr++] = target->linker_flags[i];
         }
 
         for (int i = 0; i < arrlen(target->sources); i++) {

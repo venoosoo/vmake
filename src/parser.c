@@ -142,6 +142,24 @@ void parse_cc_flags(struct Target* res,struct Token** tokens, char* value) {
     res->flags = flags_arr;
 }
 
+void parse_ld_flags(struct Target* res,struct Token** tokens, char* value) {
+    char** flags_arr = NULL;
+
+    if (value != NULL) {
+        char* token = strtok(value, " ");
+        
+        while (token != NULL) {
+            char *token_temp = xmalloc(strlen(token) + 1);
+            strcpy(token_temp, token);
+            arrpush(flags_arr, token_temp);
+            
+            token = strtok(NULL, " ");
+        }
+        
+    }
+    res->linker_flags = flags_arr;
+}
+
 
 void expected(TokenType got,TokenType expected,int* i) {
     if (got != expected) {
@@ -194,6 +212,10 @@ struct Target* parse_executable_keyword(struct Token** tokens, int *i) {
 
         else if (strcmp(key, "flags") == 0) {
             parse_cc_flags(res, tokens, tokens[(*i)++]->value);
+        }
+
+        else if (strcmp(key, "ldflags") == 0) {
+            parse_ld_flags(res, tokens, tokens[(*i)++]->value);
         }
 
         else if (strcmp(key, "output") == 0) {

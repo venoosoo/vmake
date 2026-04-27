@@ -27,6 +27,11 @@ void print_target(struct Target* target) {
     for (int i = 0; i < arrlen(target->flags); i++) {
         printf("[%s]",target->flags[i]);
     }
+    printf("\n");
+    printf("compiler flags: ");
+    for (int i = 0; i < arrlen(target->linker_flags); i++) {
+        printf("[%s]",target->linker_flags[i]);
+    }
     printf("\n\n");
 
 }
@@ -53,14 +58,14 @@ void print_current_cache(struct Cache** recompile) {
     } else {
         printf("CURRENT CACHE\n");
         for (int i = 0; i < arrlen(recompile); i++) {
-            printf("file: %s, hash: %lu\n",recompile[i]->key,recompile[i]->value->hash);
+            printf("file: %s, hash: %016lx%016lx\n",recompile[i]->key,recompile[i]->value->hash.high64,recompile[i]->value->hash.low64);
         }
     }
     
 }
 
 void print_cachce_data(struct CacheData* data) {
-    printf("hash: %lu\n",data->hash);
+    printf("hash: %016lx%016lx\n",data->hash.high64,data->hash.low64);
     printf("dependecies: ");
     for (int i = 0; i < arrlen(data->dependencies); i++) {
         printf("[%s] ",data->dependencies[i]);

@@ -80,7 +80,7 @@ int main(int argc, char** argv) {
         } else if (strcmp(arg, "-v") == 0 || strcmp(arg, "--verbose") == 0) {
             verbose = 1;
         } else if (strcmp(arg, "-V") == 0 || strcmp(arg, "--version") == 0) {
-            printf("vmake 1.0.0\n");
+            printf("vmake 1.1.0\n");
             return 0;
         }
         else {
@@ -98,9 +98,9 @@ int main(int argc, char** argv) {
     for (size_t i = 0; i < arrlen(targets); i++) {
         struct Target* target = targets[i];
         check_source_dirs(target);
-        struct Cache* saved_cache = get_saved_cache(targets[i]->name); //hashmap
+        struct Cache* saved_cache = get_saved_cache(targets[i]->name);
         struct IncludeMap* dependency_map = scan(target,saved_cache);
-        struct Cache** current_cache = get_current_cache(target,dependency_map,saved_cache); //array
+        struct Cache** current_cache = get_current_cache(target,dependency_map,saved_cache);
         struct FileCache* file_cache = xmalloc(sizeof(struct FileCache));
         
         

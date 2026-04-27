@@ -6,5 +6,6 @@ struct Target {
     char* cc;
     char** includes;
     char** flags;
+    char** linker_flags;
 };
  
